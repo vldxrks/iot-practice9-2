@@ -1,0 +1,12 @@
+{
+  "window_seconds": 10,
+  "heartbeat_timeout_seconds": 6,
+  "buffer_max_rows": 50000,
+  "rules": {
+    "temperature":   {"warn": 70,  "critical": 78,  "action": "enable_cooling"},
+    "vibration":     {"warn": 4.0, "critical": 5.5, "action": "slow_conveyor"},
+    "motor_current": {"warn": 34,  "critical": 40,  "action": "reduce_load"},
+    "pressure":      {"low_warn": 4.5, "low_critical": 4.0, "action": "close_valve"}
+  },
+  "anomaly": {"alpha": 0.05, "z_threshold": 4.5, "warmup": 40}
+}

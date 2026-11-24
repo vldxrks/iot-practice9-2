@@ -1,0 +1,113 @@
+services:
+  mqtt-broker:
+    image: eclipse-mosquitto:2
+    container_name: mqtt-broker
+    ports: ["1883:1883"]
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -h localhost -t '$$SYS/broker/uptime' -C 1 -W 3 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [edge-net, cloud-net]
+    restart: unless-stopped
+
+  influxdb:
+    image: influxdb:2.7
+    container_name: influxdb
+    ports: ["8086:8086"]
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_USER}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_PASSWORD}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_EDGE_BUCKET}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN}
+      DOCKER_INFLUXDB_INIT_RETENTION: 7d      # edge: коротке зберігання; cloud bucket створює connector (необмежено)
+    volumes: [influxdb-data:/var/lib/influxdb2]
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [edge-net, cloud-net]
+    restart: unless-stopped
+
+  sensor-simulator:
+    build: ./sensors
+    container_name: iot-sensors
+    depends_on:
+      mqtt-broker: {condition: service_healthy}
+    environment:
+      MQTT_BROKER: mqtt-broker
+      MQTT_PORT: 1883
+      SENSOR_INTERVAL: ${SENSOR_INTERVAL}
+      FAULT_PROB: ${FAULT_PROB}
+      LINES: line1,line2
+    networks: [edge-net]
+    restart: unless-stopped
+
+  edge-processor:
+    build: ./edge
+    container_name: edge-processor
+    depends_on:
+      mqtt-broker: {condition: service_healthy}
+      influxdb: {condition: service_healthy}
+    environment:
+      MQTT_BROKER: mqtt-broker
+      INFLUXDB_URL: http://influxdb:8086
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN}
+      INFLUXDB_ORG: ${INFLUXDB_ORG}
+      INFLUXDB_EDGE_BUCKET: ${INFLUXDB_EDGE_BUCKET}
+      BUFFER_DB: /data/edge_buffer.db
+    volumes: [edge-buffer:/data]            # офлайн-буфер переживає перезапуск контейнера
+    networks: [edge-net]
+    restart: unless-stopped
+
+  cloud-connector:
+    build: ./cloud
+    container_name: cloud-connector
+    depends_on:
+      mqtt-broker: {condition: service_healthy}
+      influxdb: {condition: service_healthy}
+    ports: ["5000:5000"]
+    environment:
+      MQTT_BROKER: mqtt-broker
+      INFLUXDB_URL: http://influxdb:8086
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN}
+      INFLUXDB_ORG: ${INFLUXDB_ORG}
+      INFLUXDB_CLOUD_BUCKET: ${INFLUXDB_CLOUD_BUCKET}
+    networks: [cloud-net]
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: grafana
+    ports: ["3000:3000"]
+    depends_on:
+      influxdb: {condition: service_healthy}
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN}
+      INFLUXDB_ORG: ${INFLUXDB_ORG}
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    networks: [cloud-net]
+    restart: unless-stopped
+
+volumes:
+  mosquitto-data:
+  influxdb-data:
+  edge-buffer:
+  grafana-data:
+
+networks:
+  edge-net:
+    driver: bridge
+  cloud-net:
+    driver: bridge

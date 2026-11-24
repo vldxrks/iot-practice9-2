@@ -1,0 +1,194 @@
+{
+ "title": "Smart Factory: Edge + Cloud",
+ "uid": "smart-factory",
+ "schemaVersion": 39,
+ "version": 1,
+ "refresh": "5s",
+ "time": {
+  "from": "now-15m",
+  "to": "now"
+ },
+ "panels": [
+  {
+   "id": 1,
+   "type": "timeseries",
+   "title": "Edge: температура (real-time)",
+   "datasource": {
+    "type": "influxdb",
+    "uid": "influx-edge"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 0,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "query": "from(bucket:\"edge\")|>range(start:v.timeRangeStart,stop:v.timeRangeStop)|>filter(fn:(r)=>r._measurement==\"sensor_data\" and r.sensor_id==\"temperature\")|>aggregateWindow(every:5s,fn:mean,createEmpty:false)"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "celsius"
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 2,
+   "type": "timeseries",
+   "title": "Edge: вібрація",
+   "datasource": {
+    "type": "influxdb",
+    "uid": "influx-edge"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 0,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "query": "from(bucket:\"edge\")|>range(start:v.timeRangeStart,stop:v.timeRangeStop)|>filter(fn:(r)=>r._measurement==\"sensor_data\" and r.sensor_id==\"vibration\")|>aggregateWindow(every:5s,fn:mean,createEmpty:false)"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "velocitymms"
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 3,
+   "type": "gauge",
+   "title": "Поточна температура",
+   "datasource": {
+    "type": "influxdb",
+    "uid": "influx-edge"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 8,
+    "w": 6,
+    "h": 5
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "query": "from(bucket:\"edge\")|>range(start:-1m)|>filter(fn:(r)=>r._measurement==\"sensor_data\" and r.sensor_id==\"temperature\")|>last()"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   }
+  },
+  {
+   "id": 4,
+   "type": "gauge",
+   "title": "Поточний струм двигуна",
+   "datasource": {
+    "type": "influxdb",
+    "uid": "influx-edge"
+   },
+   "gridPos": {
+    "x": 6,
+    "y": 8,
+    "w": 6,
+    "h": 5
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "query": "from(bucket:\"edge\")|>range(start:-1m)|>filter(fn:(r)=>r._measurement==\"sensor_data\" and r.sensor_id==\"motor_current\")|>last()"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   }
+  },
+  {
+   "id": 5,
+   "type": "stat",
+   "title": "Alerts за рівнем (cloud)",
+   "datasource": {
+    "type": "influxdb",
+    "uid": "influx-cloud"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 8,
+    "w": 6,
+    "h": 5
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "query": "from(bucket:\"cloud\")|>range(start:v.timeRangeStart,stop:v.timeRangeStop)|>filter(fn:(r)=>r._measurement==\"alerts\" and r._field==\"value\")|>group(columns:[\"level\"])|>count()"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   }
+  },
+  {
+   "id": 6,
+   "type": "timeseries",
+   "title": "Cloud: агрегована температура (10 с)",
+   "datasource": {
+    "type": "influxdb",
+    "uid": "influx-cloud"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 13,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "query": "from(bucket:\"cloud\")|>range(start:v.timeRangeStart,stop:v.timeRangeStop)|>filter(fn:(r)=>r._measurement==\"aggregates\" and r.sensor_id==\"temperature\" and r._field==\"mean\")"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   }
+  },
+  {
+   "id": 7,
+   "type": "timeseries",
+   "title": "Cloud: агрегований тиск (10 с)",
+   "datasource": {
+    "type": "influxdb",
+    "uid": "influx-cloud"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 13,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "query": "from(bucket:\"cloud\")|>range(start:v.timeRangeStart,stop:v.timeRangeStop)|>filter(fn:(r)=>r._measurement==\"aggregates\" and r.sensor_id==\"pressure\" and r._field==\"mean\")"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "pressurebar"
+    },
+    "overrides": []
+   }
+  }
+ ]
+}
